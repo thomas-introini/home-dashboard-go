@@ -1,0 +1,213 @@
+package templates
+
+import "fmt"
+import "time"
+
+templ header() {
+	<head>
+		<title>Home dashboard</title>
+		<script src="https://unpkg.com/htmx.org@1.9.11" defer="true"></script>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+		<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet"/>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<meta name="htmx-config" content='{"useTemplateFragments": "true"}'/>
+	</head>
+}
+
+type SensorData struct {
+	Id          string
+	Temperature float64
+	Humidity    float64
+	Date        string
+}
+
+type SensorChartData struct {
+	Labels            []string  `json:"labels"`
+	TemperatureSeries []float64 `json:"temperatureSeries"`
+	HumiditySeries    []float64 `json:"humiditySeries"`
+}
+
+script SensorChartScript(data SensorChartData) {
+    const chart = document.getElementById("chart");
+    new Chart(
+        chart,
+        {
+          type: "line",
+          data: {
+            labels: data.labels,
+            datasets: [
+              {
+                label: "Temperature",
+                data: data.temperatureSeries,
+                borderWidth: 1,
+              },
+              {
+                label: "Humidity",
+                data: data.humiditySeries,
+                borderWidth: 1,
+              },
+            ],
+          },
+          options: {
+            scales: {
+              y: {
+                beginAtZero: true,
+              },
+            },
+          },
+        }
+    );
+
+}
+
+type SelectOption struct {
+	Text  string
+	Value time.Duration
+}
+
+var (
+	INTERVALS = []SelectOption{
+		{"10 minutes", 10 * time.Minute},
+		{"30 minutes", 30 * time.Minute},
+		{"1 hour", time.Hour},
+		{"6 hour", 6 * time.Hour},
+		{"12 hour", 12 * time.Hour},
+		{"1 day", 24 * time.Hour},
+	}
+	PERIODS = []SelectOption{
+		{"last day", 24 * time.Hour},
+		{"last week", 7 * 24 * time.Hour},
+		{"last month", 30 * 24 * time.Hour},
+		{"last 6 months", 180 * 24 * time.Hour},
+		{"last year", 365 * 24 * time.Hour},
+	}
+)
+
+templ SensorChart(data SensorChartData, selectedPeriod time.Duration, selectedInterval time.Duration) {
+	<div
+		id="chart-container"
+		class="relative w-full p-3 lg:w-1/2 lg:p-0"
+		hx-target="this"
+        hx-swap="outerHTML"
+	>
+		<canvas id="chart"></canvas>
+		<div class="rounded mt-1">
+			<label for="select-interval"></label>
+			<select
+				id="select-interval"
+				name="interval"
+				class="rounded p-1 bg-gray-900 text-gray-100 border border-gray-800"
+				autocomplete="off"
+				hx-get={ string(templ.URL("/api/get-sensor-chart")) }
+				hx-include="[name='period']"
+			>
+				for _, interval := range INTERVALS {
+					<option
+						value={ fmt.Sprintf("%.0fs", interval.Value.Seconds()) }
+						if interval.Value == selectedInterval {
+							selected="true"
+                        }
+					>{ interval.Text }</option>
+				}
+			</select>
+			<label for="select-period"></label>
+			<select
+				id="select-period"
+				name="period"
+				class="rounded p-1 bg-gray-900 text-gray-100 border border-gray-800"
+				autocomplete="off"
+				hx-get={ string(templ.URL("/api/get-sensor-chart")) }
+				hx-include="[name='interval']"
+			>
+				for _, period := range PERIODS {
+					<option
+						value={ fmt.Sprintf("%.0fs", period.Value.Seconds()) }
+						if period.Value == selectedPeriod {
+							selected="true"
+						}
+					>{ period.Text }</option>
+				}
+			</select>
+		</div>
+		@SensorChartScript(data)
+	</div>
+}
+
+templ LoadMoreDataButton(limit int, offset int) {
+	<button
+		id="btn-get-more-rows"
+		hx-get={ string(templ.URL(fmt.Sprintf("/api/get-more-rows?limit=%d&offset=%d", limit, offset))) }
+		hx-swap="outerHTML"
+		class="text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 mb-2 dark:bg-gray-800 dark:hover:bg-gray-700 dark:focus:ring-gray-700 dark:border-gray-700"
+	>
+		Load more
+	</button>
+}
+
+templ SensorDataRows(data []SensorData, oob bool) {
+	<tbody
+		id="sensor-data-rows"
+		if oob {
+			hx-swap-oob="beforeend:#sensor-data-rows"
+		}
+	>
+		for _, d := range data {
+			<tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-800">
+				<td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{ d.Date }</td>
+				<td class="px-6 py-4">{ fmt.Sprintf("%.01f", d.Temperature) }°C</td>
+				<td class="px-6 py-4">{ fmt.Sprintf("%.0f", d.Humidity) }%</td>
+			</tr>
+		}
+	</tbody>
+}
+
+templ SensorDataTable(data []SensorData) {
+	<table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+		<thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+			<tr>
+				<th scope="col" class="px-6 py-3">Date</th>
+				<th scope="col" class="px-6 py-3">Temperature</th>
+				<th scope="col" class="px-6 py-3">Humidity</th>
+			</tr>
+		</thead>
+		@SensorDataRows(data, false)
+	</table>
+}
+
+templ RootPage(data []SensorData, chartData SensorChartData, limit int, offset int, period time.Duration, interval time.Duration) {
+	<html lang="en" class="dark">
+		@header()
+		<body class="dark:bg-gray-900 bg-gray-100" hx-boost="true">
+			<div class="mt-3 pl-3">
+				<a href="/">
+					<i class="fa fa-house text-gray-400 hover:text-gray-700"></i>
+				</a>
+			</div>
+			<div>
+				<div class="flex flex-col items-center justify-stretch lg:mb-5">
+					@SensorChart(chartData, period, interval)
+				</div>
+			</div>
+			<div class="px-3 lg:px-0 flex flex-col md:justify-center md:items-center">
+				if len(data) == 0 {
+					<div>
+						empty
+					</div>
+				} else {
+					<div class="overflow-auto rounded shadow-lg mb-5 w-full lg:w-1/2">
+						@SensorDataTable(data)
+					</div>
+				}
+				@LoadMoreDataButton(limit, offset+limit)
+			</div>
+		</body>
+	</html>
+}
+
+templ Composite(components ...templ.Component) {
+	for _, c := range components {
+		@c
+	}
+}
