@@ -2,7 +2,7 @@ package main
 
 import (
 	"errors"
-	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -19,6 +19,7 @@ const (
 
 func main() {
 	log := globals.Logger()
+	log.Info("Starting Home dashdoard...")
 	err := globals.LoadTz()
 	if err != nil {
 		log.Error("Could not load TZ", "error", err)
@@ -31,7 +32,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	handler := NewServer()
+	handler := NewServer(log)
 
 	httpServer := http.Server{
 		Addr:    ":8080",
@@ -44,17 +45,22 @@ func main() {
 	}
 
 	if errors.Is(err, http.ErrServerClosed) {
-		fmt.Printf("server closed\n")
+		log.Error("Server closed")
 	} else if err != nil {
-		fmt.Printf("error starting server: %s\n", err)
+		log.Error("Server closed", "error", err)
 		os.Exit(1)
 	}
 }
 
-func NewServer() http.Handler {
+func NewServer(log *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
-	fs := http.FileServer(http.Dir("./static"))
-	http.Handle("/static/", http.StripPrefix("/static/", fs))
+	staticFolder := os.Getenv("STATIC_FOLDER")
+	if staticFolder == "" {
+		staticFolder = "./static"
+	}
+	log.Info("folder " + staticFolder)
+	fs := http.FileServer(http.Dir(staticFolder))
+	mux.Handle("/static/", http.StripPrefix("/static/", fs))
 
 	addRoutes(mux)
 

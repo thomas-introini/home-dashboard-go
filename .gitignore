@@ -42,4 +42,8 @@ go.work
 
 sensor.db
 main
+home-dashboard
 tmp
+static/css/main.css
+
+node_modules

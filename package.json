@@ -1,0 +1,17 @@
+{
+  "name": "home-dashboard-go",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "scripts": {
+    "build":"tailwindcss build -i tailwind.css -o static/css/main.css --minify",
+    "watch":"tailwindcss build -i tailwind.css -o static/css/main.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.3"
+  }
+}

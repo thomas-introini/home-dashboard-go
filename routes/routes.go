@@ -139,3 +139,12 @@ func GetSensorChartHandler(w http.ResponseWriter, r *http.Request) {
 	chart := templates.SensorChart(chartData, period, interval)
 	chart.Render(context.Background(), w)
 }
+
+type InsertSensorDataBody struct {
+	Temperature float64 `json:"temperature,omitempty"`
+	Humidity    float64 `json:"humidity,omitempty"`
+}
+
+func InsertSensorDataHandler(w http.ResponseWriter, r *http.Request) {
+
+}
