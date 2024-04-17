@@ -31,13 +31,15 @@ FROM gcr.io/distroless/base-debian12
 
 WORKDIR /app
 
+COPY litestream.yml litestream.yml
+COPY static static/
+
 COPY --from=builder /home-dashboard .
 COPY --from=builder /app/litestream .
-COPY litestream.yml /litestream.yml
-COPY --from=builder /app/static ./static
-COPY --from=tailwind /static/css/main.css ./static/css/main.css
+
+COPY --from=tailwind /static/css/main.css static/css/main.css
 
 EXPOSE 8080
 
-# CMD ./litestream restore -o sensor.db s3://$SENSOR_BUCKET/db && ./litestream replicate -config /app/litestream.yml -exec "/app/home-dashboard"
-ENTRYPOINT [ "/app/home-dashboard" ]
+CMD /app/litestream restore -o sensor.db s3://$SENSOR_BUCKET/db && /app/litestream replicate -config /app/litestream.yml -exec "/app/home-dashboard"
+# ENTRYPOINT [ "/app/home-dashboard" ]

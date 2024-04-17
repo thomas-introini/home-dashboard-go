@@ -26,8 +26,8 @@ func ConnectDB() error {
 		_, err = db.Exec(`
 			CREATE TABLE IF NOT EXISTS sensor (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				temperature INTEGER, 
-				humidity INTEGER, 
+				temperature INTEGER,
+				humidity INTEGER,
 				date DATETIME DEFAULT CURRENT_TIMESTAMP
 			)`)
 		if err != nil {
@@ -103,4 +103,9 @@ func GetGroupedData(from time.Time, to time.Time, interval time.Duration) ([]Sen
 	}
 
 	return data, nil
+}
+
+func InsertSensorData(now time.Time, temperature float64, humidity float64) error {
+	_, err := DB.Exec("INSERT INTO sensor (temperature, humidity) VALUES (?, ?)", now, temperature, humidity)
+	return err
 }

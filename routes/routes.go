@@ -146,5 +146,36 @@ type InsertSensorDataBody struct {
 }
 
 func InsertSensorDataHandler(w http.ResponseWriter, r *http.Request) {
+	temperatureStr := r.URL.Query().Get("temperature")
+	humidityStr := r.URL.Query().Get("humidity")
+	if temperatureStr == "" {
+		http.Error(w, "temperature is required", 400)
+		return
+	}
+	if humidityStr == "" {
+		http.Error(w, "humidity is required", 400)
+		return
+	}
 
+	temperature, err := strconv.ParseFloat(temperatureStr, 64)
+	if err != nil {
+		http.Error(w, "temperature must be a number", 400)
+        return
+	}
+	humidity, err := strconv.ParseFloat(humidityStr, 64)
+	if err != nil {
+		http.Error(w, "humidity must be a number", 400)
+        return
+	}
+
+	log.Info("data", "temperature", temperature, "humidity", humidity)
+	err=db.InsertSensorData(time.Now(), temperature, humidity)
+	if err != nil {
+		log.Error("could not insert data", err)
+		http.Error(w, "could not insert data", 500)
+		return
+	}
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "{\"message\":\"Data stored correctly\"}")
 }

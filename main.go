@@ -71,4 +71,5 @@ func addRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /{$}", routes.RootHandler)
 	mux.HandleFunc("GET /api/get-more-rows", routes.GetMoreRowsHandler)
 	mux.HandleFunc("GET /api/get-sensor-chart", routes.GetSensorChartHandler)
+	mux.HandleFunc("POST /api/data", routes.InsertSensorDataHandler)
 }
