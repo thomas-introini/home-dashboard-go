@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"it.introini/home-dashboard/db"
@@ -51,10 +52,17 @@ func getChartRequestParams(r http.Request) (period time.Duration, interval time.
 	return period, interval
 }
 
-func getSensorData(limit int, offset int) ([]templates.SensorData, error) {
+func getIfNoneMatchHeader(r http.Request) string {
+	header := r.Header.Get("If-None-Match")
+	header, _ = strings.CutPrefix(header, "W/\"")
+	header, _ = strings.CutSuffix(header, "\"")
+	return header
+}
+
+func getSensorData(limit int, offset int) ([]templates.SensorData, time.Time, error) {
 	data, err := db.GetSensorData(limit, offset)
 	if err != nil {
-		return nil, err
+		return nil, time.Time{}, err
 	}
 	sensorRows := make([]templates.SensorData, 0)
 	for _, row := range data {
@@ -66,7 +74,7 @@ func getSensorData(limit int, offset int) ([]templates.SensorData, error) {
 		})
 	}
 
-	return sensorRows, nil
+	return sensorRows, data[0].Date, nil
 }
 
 func getChartData(period time.Duration, interval time.Duration) (templates.SensorChartData, error) {
@@ -89,10 +97,28 @@ func getChartData(period time.Duration, interval time.Duration) (templates.Senso
 	return chartData, nil
 }
 
+func getETag(updatedOn time.Time) string {
+	return fmt.Sprintf(
+		"W/\"%s\"",
+		updatedOn.Format(time.RFC3339),
+	)
+}
+
 func RootHandler(w http.ResponseWriter, r *http.Request) {
 	limit, offset := getLimitOffset(*r)
 	period, interval := getChartRequestParams(*r)
-	data, err := getSensorData(limit, offset)
+	etag := getIfNoneMatchHeader(*r)
+	if etag != "" {
+		clientUpdatedOn, err := time.Parse(time.RFC3339, etag)
+		if err == nil { // Ignore cache if cannot parse
+			serverUpdatedOn, err := db.GetLastUpdatedOn()
+			if err == nil && serverUpdatedOn == clientUpdatedOn {
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+		}
+	}
+	data, updatedOn, err := getSensorData(limit, offset)
 	if err != nil {
 		log.Error("could not get sensor data %s\n", err)
 		http.Error(w, err.Error(), 500)
@@ -108,12 +134,14 @@ func RootHandler(w http.ResponseWriter, r *http.Request) {
 	log.Info("Found grouped rows", slog.Int("rows", len(chartData.Labels)))
 
 	c := templates.RootPage(data, chartData, limit, offset, period, interval)
+	w.Header().Add("ETag", getETag(updatedOn))
+	log.Info("ETag", "etag", w.Header().Get("ETag"))
 	c.Render(context.Background(), w)
 }
 
 func GetMoreRowsHandler(w http.ResponseWriter, r *http.Request) {
 	limit, offset := getLimitOffset(*r)
-	data, err := getSensorData(limit, offset)
+	data, _, err := getSensorData(limit, offset)
 	if err != nil {
 		log.Error("Could not get sensor data", err)
 		http.Error(w, err.Error(), 500)
@@ -160,16 +188,16 @@ func InsertSensorDataHandler(w http.ResponseWriter, r *http.Request) {
 	temperature, err := strconv.ParseFloat(temperatureStr, 64)
 	if err != nil {
 		http.Error(w, "temperature must be a number", 400)
-        return
+		return
 	}
 	humidity, err := strconv.ParseFloat(humidityStr, 64)
 	if err != nil {
 		http.Error(w, "humidity must be a number", 400)
-        return
+		return
 	}
 
 	log.Info("data", "temperature", temperature, "humidity", humidity)
-	err=db.InsertSensorData(time.Now(), temperature, humidity)
+	err = db.InsertSensorData(time.Now(), temperature, humidity)
 	if err != nil {
 		log.Error("could not insert data", err)
 		http.Error(w, "could not insert data", 500)

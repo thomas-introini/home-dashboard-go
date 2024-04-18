@@ -109,3 +109,23 @@ func InsertSensorData(now time.Time, temperature float64, humidity float64) erro
 	_, err := DB.Exec("INSERT INTO sensor (temperature, humidity) VALUES (?, ?)", now, temperature, humidity)
 	return err
 }
+
+func GetLastUpdatedOn() (time.Time, error) {
+	rows, err := DB.Query("SELECT MAX(date) as max FROM sensor")
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	next := rows.Next()
+	if !next {
+		return time.Time{}, err
+	}
+
+	var dateStr string
+	err = rows.Scan(&dateStr)
+	date, err := time.Parse("2006-01-02 15:04:05", dateStr)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return date, nil
+}
