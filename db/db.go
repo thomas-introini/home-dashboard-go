@@ -5,9 +5,13 @@ import (
 	"fmt"
 	"os"
 	"time"
+
+	"it.introini/home-dashboard/globals"
 )
 
 var DB *sql.DB
+
+var DB_FORMAT = "2006-01-02 15:04:05"
 
 type SensorData struct {
 	Id          int
@@ -33,6 +37,11 @@ func ConnectDB() error {
 		if err != nil {
 			return err
 		}
+	}
+	_, err = db.Exec("PRAGMA busy_timeout = 5000;")
+	if err != nil {
+		globals.Logger().Error("Error setting busy timeout: %s", err)
+		return nil
 	}
 	DB = db
 	return nil
@@ -94,7 +103,7 @@ func GetGroupedData(from time.Time, to time.Time, interval time.Duration) ([]Sen
 		if dateStr == "" {
 			continue
 		}
-		date, err := time.Parse("2006-01-02 15:04:05", dateStr)
+		date, err := time.Parse(DB_FORMAT, dateStr)
 		if err != nil {
 			return nil, err
 		}
@@ -106,7 +115,7 @@ func GetGroupedData(from time.Time, to time.Time, interval time.Duration) ([]Sen
 }
 
 func InsertSensorData(now time.Time, temperature float64, humidity float64) error {
-	_, err := DB.Exec("INSERT INTO sensor (temperature, humidity) VALUES (?, ?)", now, temperature, humidity)
+	_, err := DB.Exec("INSERT INTO sensor (date, temperature, humidity) VALUES (?, ?, ?)", now.Format(DB_FORMAT), temperature, humidity)
 	return err
 }
 
@@ -123,7 +132,7 @@ func GetLastUpdatedOn() (time.Time, error) {
 
 	var dateStr string
 	err = rows.Scan(&dateStr)
-	date, err := time.Parse("2006-01-02 15:04:05", dateStr)
+	date, err := time.Parse(DB_FORMAT, dateStr)
 	if err != nil {
 		return time.Time{}, err
 	}

@@ -24,22 +24,24 @@ RUN wget https://github.com/benbjohnson/litestream/releases/download/v0.3.13/lit
     && tar xvf litestream-v0.3.13-linux-amd64.tar.gz
 
 # Build (go-sqlite3 requires CGO_ENABLED=1)
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o /home-dashboard
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o home-dashboard
 
 # Second stage: setup the runtime environment
-FROM gcr.io/distroless/base-debian12
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y ca-certificates
 
 WORKDIR /app
 
 COPY litestream.yml litestream.yml
 COPY static static/
+COPY docker_entrypoint docker_entrypoint
 
-COPY --from=builder /home-dashboard .
+COPY --from=builder /app/home-dashboard .
 COPY --from=builder /app/litestream .
 
 COPY --from=tailwind /static/css/main.css static/css/main.css
 
 EXPOSE 8080
 
-CMD /app/litestream restore -o sensor.db s3://$SENSOR_BUCKET/db && /app/litestream replicate -config /app/litestream.yml -exec "/app/home-dashboard"
-# ENTRYPOINT [ "/app/home-dashboard" ]
+ENTRYPOINT [ "/app/docker_entrypoint" ]

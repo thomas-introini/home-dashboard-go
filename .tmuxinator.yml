@@ -1,7 +1,7 @@
 # ./.tmuxinator.yml
 
 name: home-dashboard-go
-root: .
+root: ~/projects/home-dashboard-go
 
 # Optional tmux socket
 # socket_name: foo

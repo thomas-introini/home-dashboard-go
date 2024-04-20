@@ -1,0 +1,7 @@
+#! /bin/sh
+
+set -e
+
+/app/litestream restore -o sensor.db s3://$SENSOR_BUCKET/$SENSOR_KEY
+
+/app/litestream replicate -config /app/litestream.yml -exec "/app/home-dashboard"

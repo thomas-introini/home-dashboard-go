@@ -1,6 +1,6 @@
 dbs:
   - path: ./sensor.db
     replicas:
-      - url: s3://$SENSOR_BUCKET/db
+      - url: s3://$SENSOR_BUCKET/$SENSOR_KEY
         sync-interval: 24h
 
